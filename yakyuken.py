@@ -3,6 +3,7 @@ import random
 from enum import Enum
 from math import sqrt
 import platform
+import json
 
 
 is_web_launcher = True
@@ -531,6 +532,19 @@ class Character(ObjectBase):
 
         self.e_val_b = 0        # 横揺れ変数
         self.cnt = DAMAGE_WAIT  # 横揺れ時間
+        if side == CTRL_COM:
+            self.img0 = pyxel.Image(144, 256)
+            self.img0.load(x=0, y=0, filename='assets/0000.png')
+            # self.img1 = pyxel.Image(144, 256)
+            # self.img1.load(x=0, y=0, filename='assets/0001.png')
+            # self.img2 = pyxel.Image(144, 256)
+            # self.img2.load(x=0, y=0, filename='assets/0002.png')
+            # self.img3 = pyxel.Image(144, 256)
+            # self.img3.load(x=0, y=0, filename='assets/0003.png')
+            # self.img4 = pyxel.Image(144, 256)
+            # self.img4.load(x=0, y=0, filename='assets/0004.png')
+            # self.img5 = pyxel.Image(144, 256)
+            # self.img5.load(x=0, y=0, filename='assets/0005.png')
 
     def update(self):
         '''
@@ -557,14 +571,28 @@ class Character(ObjectBase):
         描画
         '''
         idx = LIFE_MAX - lifebox.life
-        pyxel.dither(0.5)
-        # debug
-        pyxel.rect(self.x, self.y,
-                   self.w, self.h, pyxel.COLOR_WHITE + idx)
-        pyxel.dither(1.0)
-        if self.side == CTRL_PLAYER: 
+
+        if self.side == CTRL_PLAYER:
+            pyxel.dither(0.5)
+            # debug
+            pyxel.rect(self.x, self.y,
+                    self.w, self.h, pyxel.COLOR_WHITE + idx)
+            pyxel.dither(1.0) 
             self.DrawText(self.x + 4, self.y + 4, 'Player', pyxel.COLOR_WHITE)
         else:
+            pyxel.blt(self.x - 40, self.y, self.img0, 0, 0, 144, 256, colkey=16)
+            # if idx == 0:
+            #     pyxel.blt(self.x - 40, self.y, self.img0, 0, 0, 144, 256, colkey=16)
+            # if idx == 1:
+            #     pyxel.blt(self.x - 40, self.y, self.img1, 0, 0, 144, 256, colkey=16)
+            # if idx == 2:
+            #     pyxel.blt(self.x - 40, self.y, self.img2, 0, 0, 144, 256, colkey=16)
+            # if idx == 3:
+            #     pyxel.blt(self.x - 40, self.y, self.img3, 0, 0, 144, 256, colkey=16)
+            # if idx == 4:
+            #     pyxel.blt(self.x - 40, self.y, self.img4, 0, 0, 144, 256, colkey=16)
+            # if idx == 5:
+            #     pyxel.blt(self.x - 40, self.y, self.img5, 0, 0, 144, 256, colkey=16)
             self.DrawText(self.x + 4, self.y + 4, 'COM', pyxel.COLOR_WHITE)
 
     def Wave(self, offset: float, a: float, b: float) -> float:
@@ -790,6 +818,12 @@ class App(ObjectBase):
         リソースファイルの読み込み
         '''
         pyxel.images[0].load(0, 0, 'assets/Pallet.png', incl_colors=True)
+        with open(f"assets/music.json", "rt",encoding="utf-8") as fin:
+            self.music = json.loads(fin.read())
+        if pyxel.play_pos(0) is None:
+            for ch, sound in enumerate(self.music):
+                pyxel.sound(ch).set(*sound)
+                pyxel.play(ch, ch, loop=True)
 
     def DefineVariables(self):
         '''
@@ -933,8 +967,9 @@ class App(ObjectBase):
             self.DrawTextCenter(top + 15, 'Click to start',
                                 pyxel.COLOR_WHITE, pyxel.COLOR_NAVY)
         else:
-            self.player.draw()
             self.com.draw()
+            self.player.draw()
+            
             self.msg_box.draw()
             if self.choose is not None:
                 self.choose.draw()
