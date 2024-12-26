@@ -48,7 +48,9 @@ CARD_OP_ADD = CARD_OPEN_OFFSET / (FPS / 2)
 
 # ライフ最大値
 LIFE_MAX = 5
-ONE_LIFE_W = 12
+ONE_LIFE_W = 15
+LIFE_H = 15
+LIFE_W = ONE_LIFE_W * LIFE_MAX + 2
 
 # ダメージ表現実施時間
 DAMAGE_WAIT = 60
@@ -131,6 +133,29 @@ class ObjectBase:
         '''
         pyxel.rectb(self.x, self.y, self.w, self.h, outer_color)
         pyxel.rect(self.x + 1, self.y + 1, self.w - 2, self.h - 2, inner_color)
+
+    def DrawTextCenter(self, y: float, s: str,
+                       col: int, bcol: int = None):
+        '''
+        縁取りテキスト描画中央寄せ
+        '''
+        # 中央寄せ
+        x = (pyxel.width / 2) - (FONT_JP.text_width(s) / 2)
+        self.DrawText(x, y, s, col, bcol)
+
+    def DrawText(self, x: float,  y: float, s: str,
+                 col: int, bcol: int = None):
+        '''
+        縁取りテキスト描画
+        '''
+        if bcol is None:
+            bcol = pyxel.COLOR_BLACK
+        # アウトライン描画
+        for dx in range(-1, 2):
+            for dy in range(-1, 2):
+                if dx != 0 or dy != 0:
+                    pyxel.text(x + dx, y + dy, s, bcol, FONT_JP)
+        pyxel.text(x, y, s, col, FONT_JP)
 
 
 class Card(ObjectBase):
@@ -226,8 +251,10 @@ class Card(ObjectBase):
                 txt = 'C'
             else:
                 txt = 'P'
-        pyxel.text(self.x + self.w / 2 - 3, self.y + self.h / 2 - 4,
-                   txt, pyxel.COLOR_WHITE, FONT_JP)
+        self.DrawText(self.x + self.w / 2 - 3,
+                      self.y + self.h / 2 - 4,
+                      txt, pyxel.COLOR_WHITE)
+
         # ハイライト表示
         if self.is_mouse_over and self.is_show:
             pyxel.rectb(self.x - 1, self.y - 1,
@@ -328,7 +355,7 @@ class Deck(ObjectBase):
         '''
         対決用の大きい表示のカードを作成
         '''
-        return Card(x, pyxel.height / 2 - CARD_H, 0,
+        return Card(x, pyxel.height / 2 - CARD_H * 2, 0,
                     type, self.side == CTRL_PLAYER, True)
 
     def Shuffle(self, g: list[int], c: list[int],
@@ -446,8 +473,7 @@ class LifeBox(ObjectBase):
     ライフゲージクラス
     '''
     def __init__(self, x, y):
-        w = ONE_LIFE_W * LIFE_MAX + 2
-        super().__init__(x, y, w, 12)
+        super().__init__(x, y, LIFE_W, LIFE_H)
         self.life = LIFE_MAX
         self.offset = 0
         self.next = 0
@@ -468,18 +494,19 @@ class LifeBox(ObjectBase):
         描画
         '''
         # 外枠
-        pyxel.rectb(self.x + 30, self.y, self.w, self.h,
+        pyxel.rectb(self.x, self.y, self.w, self.h,
                     pyxel.COLOR_GRAY)
         # 背景色
-        pyxel.rect(self.x + 31, self.y + 1,
+        pyxel.rect(self.x + 1, self.y + 1,
                    self.w - 2, self.h - 2, pyxel.COLOR_RED)
         # ライフゲージ
-        pyxel.rect(self.x + 31, self.y + 1,
+        pyxel.rect(self.x + 1, self.y + 1,
                    self.w - 2 - self.offset, self.h - 2,
                    pyxel.COLOR_GREEN)
         # ラベル
-        pyxel.text(self.x, self.y + 2, 'Life',
-                   pyxel.COLOR_WHITE, FONT_JP)
+        self.DrawText(self.x + 3, self.y + 2,
+                      f'Life {self.life}/{LIFE_MAX}',
+                      pyxel.COLOR_WHITE)
 
     def Damege(self, dmg: int):
         '''
@@ -494,8 +521,9 @@ class Character(ObjectBase):
     '''
     キャラクタクラス
     '''
-    def __init__(self, x: float, y: float):
-        super().__init__(x, y, 60, 120)
+    def __init__(self, x: float, y: float, side: int):
+        super().__init__(x, y, 60, 128)
+        self.side = side
         self.e_val_a = pyxel.rndi(-60, 60)
         self.y_base = y
         self.x_base = x
@@ -529,9 +557,15 @@ class Character(ObjectBase):
         描画
         '''
         idx = LIFE_MAX - lifebox.life
+        pyxel.dither(0.5)
         # debug
         pyxel.rect(self.x, self.y,
                    self.w, self.h, pyxel.COLOR_WHITE + idx)
+        pyxel.dither(1.0)
+        if self.side == CTRL_PLAYER: 
+            self.DrawText(self.x + 4, self.y + 4, 'Player', pyxel.COLOR_WHITE)
+        else:
+            self.DrawText(self.x + 4, self.y + 4, 'COM', pyxel.COLOR_WHITE)
 
     def Wave(self, offset: float, a: float, b: float) -> float:
         '''
@@ -559,15 +593,23 @@ class Player(ObjectBase):
         else:
             super().__init__(pyxel.width / 2, 0,
                              pyxel.width / 2, pyxel.height)
-        dec_x = self.x + self.w / 2 - HAND_W / 2
-        # 手札位置セット
-        self.deck = Deck(dec_x, self.y + 5, self.side)
-        # ライフゲージセット
-        self.life = LifeBox(self.deck.x + 2,
-                            self.deck.y + self.deck.h + 5)
-        # キャラクターセット
-        self.chara = Character(self.x + self.w / 2 - 30,
-                               self.y + self.deck.y + self.deck.h + 20)
+        
+        # 手札位置,ライフゲージ,キャラクターセット
+        if self.side == CTRL_PLAYER:
+            dec_x = pyxel.width - HAND_W - 15
+            dec_y = MSG_BOX_TOP - 50
+            self.deck = Deck(dec_x, dec_y, self.side)
+            self.life = LifeBox(self.deck.x - LIFE_W - 10,
+                                self.deck.y + self.deck.h - LIFE_H - 3)
+            self.chara = Character(20, MSG_BOX_TOP - 5 - 120, self.side)
+        else:
+            dec_x = 15
+            dec_y = 10
+            self.deck = Deck(dec_x, dec_y, self.side)
+            self.life = LifeBox(self.deck.x + self.deck.w + 10,
+                                self.deck.y + self.deck.h - LIFE_H - 3)
+            com_x = pyxel.width - 60 - 20
+            self.chara = Character(com_x, 20, self.side)
         self.g = 0
         self.c = 0
         self.p = 0
@@ -586,9 +628,27 @@ class Player(ObjectBase):
         '''
         描画
         '''
-        self.chara.draw(self.life)
-        self.deck.draw()
-        self.life.draw()
+
+        if self.side == CTRL_PLAYER:
+            self.chara.draw(self.life)
+            self.deck.draw()
+            self.life.draw()
+            pyxel.rect(self.deck.x + self.deck.w + 5, self.deck.y - 5,
+                       2, self.deck.h + 10,
+                       pyxel.COLOR_GRAY)
+            pyxel.rect(self.life.x, self.deck.y + self.deck.h + 5,
+                       self.life.w + self.deck.w + 16, 2,
+                       pyxel.COLOR_GRAY)
+        else:
+            pyxel.rect(8, self.deck.y - 5,
+                       2, self.deck.h + 10,
+                       pyxel.COLOR_GRAY)
+            pyxel.rect(8, self.deck.y + self.deck.h + 3,
+                       self.life.w + self.deck.w + 20, 2,
+                       pyxel.COLOR_GRAY)
+            self.deck.draw()
+            self.life.draw()
+            self.chara.draw(self.life)
 
 
 class Button(ObjectBase):
@@ -621,8 +681,8 @@ class Button(ObjectBase):
             self.LineRect(pyxel.COLOR_YELLOW, pyxel.COLOR_GRAY)
         else:
             self.LineRect(pyxel.COLOR_WHITE, pyxel.COLOR_GRAY)
-        pyxel.text(self.x + 4, self.y + 4, self.text,
-                   pyxel.COLOR_BLACK, FONT_JP)
+        self.DrawText(self.x + 4, self.y + 4, self.text,
+                      pyxel.COLOR_GRAY)
 
 
 class ChooseBox(ObjectBase):
@@ -692,8 +752,8 @@ class MessageBox(ObjectBase):
         描画
         '''
         self.LineRect(pyxel.COLOR_WHITE, pyxel.COLOR_GRAY)
-        pyxel.text(self.x + 2, self.y + 2, self.disp,
-                   pyxel.COLOR_BLACK, FONT_JP)
+        self.DrawText(self.x + 5, self.y + 3, self.disp,
+                      pyxel.COLOR_GRAY)
 
     def SetMessage(self, msg: str):
         '''
@@ -714,8 +774,9 @@ class MessageBox(ObjectBase):
         self.disp = ''
 
 
-class App:
+class App(ObjectBase):
     def __init__(self):
+        super().__init__(0, 0, 0, 0)
         pyxel.init(WINDOW_WIDTH, WINDOW_HEIGHT,
                    title=TITLE, fps=FPS, display_scale=2)
         deviceChecker = DeviceChecker()
@@ -878,12 +939,12 @@ class App:
             if self.choose is not None:
                 self.choose.draw()
 
-            y = self.player.life.y + self.player.life.h + 10
-            self.DrawText(self.player.x + 5, y, f'G x {self.player.g}',
+            y = self.player.deck.y - 5
+            self.DrawText(10, y, f'G x {self.player.g}',
                           pyxel.COLOR_WHITE, pyxel.COLOR_BLACK)
-            self.DrawText(self.player.x + 5, y + 15, f'C x {self.player.c}',
+            self.DrawText(10, y + 15, f'C x {self.player.c}',
                           pyxel.COLOR_WHITE, pyxel.COLOR_BLACK)
-            self.DrawText(self.player.x + 5, y + 30, f'P x {self.player.p}',
+            self.DrawText(10, y + 30, f'P x {self.player.p}',
                           pyxel.COLOR_WHITE, pyxel.COLOR_BLACK)
 
         # debug
@@ -913,29 +974,6 @@ class App:
 
         # それ以外は負け
         return -1
-
-    def DrawTextCenter(self, y: float, s: str,
-                       col: int, bcol: int = None):
-        '''
-        縁取りテキスト描画中央寄せ
-        '''
-        # 中央寄せ
-        x = (pyxel.width / 2) - (FONT_JP.text_width(s) / 2)
-        self.DrawText(x, y, s, col, bcol)
-
-    def DrawText(self, x: float,  y: float, s: str,
-                 col: int, bcol: int = None):
-        '''
-        縁取りテキスト描画
-        '''
-        if bcol is None:
-            bcol = pyxel.COLOR_BLACK
-        # アウトライン描画
-        for dx in range(-1, 2):
-            for dy in range(-1, 2):
-                if dx != 0 or dy != 0:
-                    pyxel.text(x + dx, y + dy, s, bcol, FONT_JP)
-        pyxel.text(x, y, s, col, FONT_JP)
 
     def IsEnd(self) -> bool:
         '''
