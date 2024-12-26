@@ -374,7 +374,7 @@ class Deck(ObjectBase):
         '''
         COM用, カードを開く
         '''
-        if self.is_show is False and self.selected_card is not None:
+        if self.side == CTRL_COM and self.selected_card is not None:
             self.selected_card.state = CardState.ROTATION
             self.selected_card.x_offset = CARD_OPEN_OFFSET * -1
 
@@ -406,7 +406,7 @@ class Deck(ObjectBase):
         if 0 < len(self.cards):
             card = self.cards.pop()
             self.hands.append(Card(self.x, self.y, len(self.hands),
-                                   card, self.is_show))
+                                   card, self.side == CTRL_PLAYER))
 
     def HandLock(self):
         '''
