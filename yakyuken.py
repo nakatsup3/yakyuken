@@ -18,6 +18,8 @@ PA = pyxel.COLOR_LIGHT_BLUE     # パー
 CARD_W = 13.5
 CARD_H = 24
 
+# 各カードの枚数
+CARD_NUM = 10
 # 手札の枚数
 HAND_MAX = 5
 # 手札表示幅
@@ -227,15 +229,13 @@ class Deck(ObjectBase):
     '''
     カードをまとめた山札・手札クラス
     '''
-    def __init__(self, x: float, y: float, is_show: bool):
+    def __init__(self, x: float, y: float, side: int):
         h = CARD_H + 10
         super().__init__(x, y, HAND_W, h)
-        # カードの表示・非表示
-        self.is_show = is_show
 
-        g = [GU] * 10
-        c = [CH] * 10
-        p = [PA] * 10
+        g = [GU] * CARD_NUM
+        c = [CH] * CARD_NUM
+        p = [PA] * CARD_NUM
         # シャッフルして山札へセット
         self.cards = self.Shuffle(g, c, p)
 
@@ -243,10 +243,11 @@ class Deck(ObjectBase):
         self.hands = []
         cnt = 0
         for _ in range(HAND_MAX):
-            card = self.cards.pop()
-            self.hands.append(Card(self.x, self.y, cnt,
-                                   card, self.is_show))
-            cnt += 1
+            if 0 < len(self.cards):
+                card = self.cards.pop()
+                self.hands.append(Card(self.x, self.y, cnt,
+                                       card, side == CTRL_PLAYER))
+                cnt += 1
 
         # 場に出しているカード
         self.selected_card = None
@@ -256,7 +257,7 @@ class Deck(ObjectBase):
         '''
         データ更新
         '''
-        if self.is_show is False:
+        if side == CTRL_COM:
             self.RandomPick()
 
         select_cnt = 0
@@ -398,6 +399,22 @@ class Deck(ObjectBase):
         for hnd in self.hands:
             hnd.SetLock(False)
 
+    def DeckCount(self) -> tuple[int, int, int]:
+        '''
+        デッキ残り枚数カウント
+        '''
+        g = 0
+        c = 0
+        p = 0
+        for crd in self.cards:
+            if crd == GU:
+                g += 1
+            if crd == CH:
+                c += 1
+            if crd == PA:
+                p += 1
+        return g, c, p
+
 
 class LifeBox(ObjectBase):
     '''
@@ -509,9 +526,9 @@ class Player(ObjectBase):
     '''
     対戦するキャラクタのクラス
     '''
-    def __init__(self, type: int):
-        self.type = type
-        if self.type == CTRL_PLAYER:
+    def __init__(self, side: int):
+        self.side = side
+        if self.side == CTRL_PLAYER:
             super().__init__(0, 0,
                              pyxel.width / 2, pyxel.height)
         else:
@@ -519,21 +536,26 @@ class Player(ObjectBase):
                              pyxel.width / 2, pyxel.height)
         dec_x = self.x + self.w / 2 - HAND_W / 2
         # 手札位置セット
-        self.deck = Deck(dec_x, self.y + 5, self.type == CTRL_PLAYER)
+        self.deck = Deck(dec_x, self.y + 5, self.side)
         # ライフゲージセット
         self.life = LifeBox(self.deck.x + 2,
                             self.deck.y + self.deck.h + 5)
         # キャラクターセット
         self.chara = Character(self.x + self.w / 2 - 30,
                                self.y + self.deck.y + self.deck.h + 20)
+        self.g = 0
+        self.c = 0
+        self.p = 0
 
     def update(self):
         '''
         データ更新
         '''
-        self.deck.update(self.x, self.type)
+        self.deck.update(self.x, self.side)
         self.chara.update()
         self.life.update()
+        if self.side == CTRL_PLAYER:
+            self.g, self.c, self.p = self.deck.DeckCount()
 
     def draw(self):
         '''
@@ -692,6 +714,8 @@ class App:
         self.game_sate = GameState.TITLE
         self.choose = None
         self.wait = 0
+        
+        self.is_debug_view = False
 
     def update(self):
         '''
@@ -701,6 +725,9 @@ class App:
             self.player.update()
             self.com.update()
             self.msg_box.update()
+
+            # debug
+            self.is_debug_view = pyxel.btn(pyxel.KEY_D)
 
         if GameState.TITLE == self.game_sate:
             # タイトル画面
@@ -825,10 +852,19 @@ class App:
             if self.choose is not None:
                 self.choose.draw()
 
+            y = self.player.life.y + self.player.life.h + 10
+            self.DrawText(self.player.x + 5, y, f'G x {self.player.g}',
+                          pyxel.COLOR_WHITE, pyxel.COLOR_BLACK)
+            self.DrawText(self.player.x + 5, y + 15, f'C x {self.player.c}',
+                          pyxel.COLOR_WHITE, pyxel.COLOR_BLACK)
+            self.DrawText(self.player.x + 5, y + 30, f'P x {self.player.p}',
+                          pyxel.COLOR_WHITE, pyxel.COLOR_BLACK)
+
         # debug
-        if self.com.deck.selected_card is not None:
-            pyxel.rect(pyxel.width - 4, pyxel.height - 4,
-                       4, 4, self.com.deck.selected_card.type)
+        if self.is_debug_view:
+            if self.com.deck.selected_card is not None:
+                pyxel.rect(pyxel.width - 4, pyxel.height - 4,
+                           4, 4, self.com.deck.selected_card.type)
 
     def Battle(self) -> int:
         '''
@@ -855,10 +891,17 @@ class App:
     def DrawTextCenter(self, y: float, s: str,
                        col: int, bcol: int = None):
         '''
-        縁取りテキスト描画
+        縁取りテキスト描画中央寄せ
         '''
         # 中央寄せ
         x = (pyxel.width / 2) - (FONT_JP.text_width(s) / 2)
+        self.DrawText(x, y, s, col, bcol)
+
+    def DrawText(self, x: float,  y: float, s: str,
+                 col: int, bcol: int = None):
+        '''
+        縁取りテキスト描画
+        '''
         if bcol is None:
             bcol = pyxel.COLOR_BLACK
         # アウトライン描画
