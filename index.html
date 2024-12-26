@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Catfall</title>
+  <title>Yakyuken</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
   <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.slim.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+  
 </head>
 <body>
 
 <div class="jumbotron text-center">
-  <h1>限定じゃんけん 野球拳</h1>
-  <p>クリックでゲームプレイできます。</p>
+  <h1>限定野球拳</h1>
+  <p>Play クリックでゲームプレイできます。</p>
   <a href="./play.html">Play</a>
 </div>
   
@@ -21,15 +21,27 @@
   <div class="row">
     <div class="col-sm-8">
       <h3>あそびかた</h3>
-      <p>手札を選択して場に出す</p>
+      <p>最初に5枚のカードが手札として配られます。</p>
+      <p>その手札から1枚を選択して場に出す。</p>
       <br/>
-      <p>じゃんけん勝てば、相手のライフが減り</p>
-      <p>負ければ自分のライフが減ります。</p>
-      <p>ライフが無くなった方が負けです。</p>
+      <p>場に出したカードでじゃんけんを行う。</p>
+      <br/>
+      <p>勝てば相手のライフが減り</p>
+      <p>負ければ自分のライフが減る。</p>
+      <p>ライフが無くなった方が負け。</p>
       <br/>
       <p>カードの種類は以下の通り</p>
       <p>G:グー, C:チョキ, P:パー</p>
       <br/>
+      <p>GはCに強い、CはPに強い、PはGに強い</p>
+      <p>強いほうを出したらそのラウンドは勝ち。</p>
+      <p>お互いのカードが同じ場合はあいことして仕切り直す。</p>
+      <br/>
+      <p>カードはグー・チョキ・パー１０枚ずつ</p>
+      <p>計30枚持っている。</p>
+      <br/>
+      <p>毎ターン１枚カードが補充される</p>
+      <p>カードの供給は山札からランダムである。</p>
     </div>
   </div>
 </div>
