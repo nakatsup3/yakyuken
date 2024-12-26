@@ -2,6 +2,14 @@ import pyxel
 import random
 from enum import Enum
 from math import sqrt
+import platform
+
+
+is_web_launcher = True
+try:
+    from js import navigator
+except ImportError:
+    is_web_launcher = False
 
 # ウインドウ設定
 WINDOW_HEIGHT = 256
@@ -44,6 +52,23 @@ ONE_LIFE_W = 12
 
 # ダメージ表現実施時間
 DAMAGE_WAIT = 60
+
+class DeviceChecker:
+    def __init__(self):
+        if is_web_launcher:
+            # Web launcherから起動している場合、js関数でOS判定する
+            self.user_agent = navigator.userAgent.lower()
+            self.os_pc = not ("android" in self.user_agent
+                              or "iphone" in self.user_agent
+                              or "ipad" in self.user_agent)
+        else:
+            # ローカルから起動している場合、platformから判定する
+            self.os_name = platform.system()
+            self.os_pc = self.os_name == "Windows" \
+                         or self.os_name == "Darwin" \
+                         or self.os_name == "Linux"
+    def is_pc(self):
+        return self.os_pc
 
 
 class GameState(Enum):
@@ -693,7 +718,8 @@ class App:
     def __init__(self):
         pyxel.init(WINDOW_WIDTH, WINDOW_HEIGHT,
                    title=TITLE, fps=FPS, display_scale=2)
-        pyxel.mouse(True)
+        deviceChecker = DeviceChecker()
+        pyxel.mouse(deviceChecker.is_pc())
         self.ReadResources()
         self.DefineVariables()
         pyxel.run(self.update, self.draw)
