@@ -248,7 +248,7 @@ class Deck(ObjectBase):
                 self.hands.append(Card(self.x, self.y, cnt,
                                        card, side == CTRL_PLAYER))
                 cnt += 1
-
+        self.side = side
         # 場に出しているカード
         self.selected_card = None
         self.selected_idx = -1
@@ -304,7 +304,7 @@ class Deck(ObjectBase):
         対決用の大きい表示のカードを作成
         '''
         return Card(x, pyxel.height / 2 - CARD_H, 0,
-                    type, self.is_show, True)
+                    type, self.side == CTRL_PLAYER, True)
 
     def Shuffle(self, g: list[int], c: list[int],
                 p: list[int]) -> list[int]:
