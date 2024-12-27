@@ -989,7 +989,7 @@ class App(ObjectBase):
         データ更新
         '''
         if GameState.TITLE != self.game_sate \
-                or GameState.GALLARY != self.game_sate:
+                and GameState.GALLARY != self.game_sate:
             self.player.update()
             self.com.update()
             self.msg_box.update()
