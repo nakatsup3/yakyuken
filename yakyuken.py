@@ -100,8 +100,9 @@ class GameState(Enum):
     OPEN = 3        # COMのカード表示
     RESULT = 4      # じゃんけん結果
     GAME_SET = 5    # 決着
-    END = 6         # リセット待ち状態
-
+    END = 6         # 
+    END_WAIT = 7    #
+    GALLARY = 8     #
 
 class CardState(Enum):
     '''
@@ -196,6 +197,17 @@ class ObjectBase:
                     pyxel.text(x + dx, y + dy, s, bcol, FONT_JP)
         pyxel.text(x, y, s, col, FONT_JP)
 
+    def BGMChange(self, music):
+        '''
+        BGM変更
+        '''
+        # 全チャンネルBGM　OFF
+        pyxel.stop()
+        # if pyxel.play_pos(0) is None:
+        # BGM再生
+        for ch, sound in enumerate(music):
+            pyxel.sound(ch).set(*sound)
+            pyxel.play(ch, ch, loop=True)
 
 class Card(ObjectBase):
     '''
@@ -210,9 +222,11 @@ class Card(ObjectBase):
             self.x_pos = x
             dx = x - CARD_W * 2
             if is_show is False:
+                # COMの場合は右から左へ動かす
                 dx = x + CARD_W * 2
             super().__init__(dx, y, CARD_W * 2, CARD_H * 2)
         else:
+            # 表示位置をずらして配置
             self.x_pos = x + (CARD_W + 5) * pos + 5
             super().__init__(x - CARD_W, y + 5, CARD_W, CARD_H)
 
@@ -230,9 +244,10 @@ class Card(ObjectBase):
             # 所定の位置へ移動
             dx = abs(self.x_pos - self.x) / 10.0
             if self.is_show is False and self.is_big:
-                self.x -= dx
+                self.x -= dx    # COM
             else:
-                self.x += dx
+                self.x += dx    # Player
+            # 所定の位置についたら待機状態へ遷移
             if self.x - 0.1 <= self.x_pos <= self.x + 0.1:
                 self.state = CardState.WAIT
                 self.x = self.x_pos
@@ -551,7 +566,10 @@ class LifeBox(ObjectBase):
         '''
         ライフゲージをダメージ分減らす
         '''
-        self.life -= dmg
+        if dmg < 0:
+            self.life = min(LIFE_MAX, self.life - dmg)
+        else:
+            self.life = max(0, self.life - dmg)
         self.next = (LIFE_MAX - self.life) * ONE_LIFE_W
         self.state = LifeState.DECRASE
 
@@ -671,16 +689,19 @@ class Player(ObjectBase):
         self.g = 0
         self.c = 0
         self.p = 0
+        self.show_ui = True
 
     def update(self):
         '''
         データ更新
         '''
-        self.deck.update(self.x, self.side)
         self.chara.update()
-        self.life.update()
-        if self.side == CTRL_PLAYER:
-            self.g, self.c, self.p = self.deck.DeckCount()
+
+        if self.show_ui:
+            self.deck.update(self.x, self.side)
+            self.life.update()
+            if self.side == CTRL_PLAYER:
+                self.g, self.c, self.p = self.deck.DeckCount()
 
     def draw(self):
         '''
@@ -689,39 +710,52 @@ class Player(ObjectBase):
 
         if self.side == CTRL_PLAYER:
             self.chara.draw(self.life)
-            self.deck.draw()
-            self.life.draw()
-            pyxel.rect(self.deck.x + self.deck.w + 5, self.deck.y - 5,
-                       2, self.deck.h + 10,
-                       pyxel.COLOR_GRAY)
-            pyxel.rect(self.life.x, self.deck.y + self.deck.h + 5,
-                       self.life.w + self.deck.w + 16, 2,
-                       pyxel.COLOR_GRAY)
+            if self.show_ui:
+                self.deck.draw()
+                self.life.draw()
+                pyxel.rect(self.deck.x + self.deck.w + 5, self.deck.y - 5,
+                        2, self.deck.h + 10,
+                        pyxel.COLOR_GRAY)
+                pyxel.rect(self.life.x, self.deck.y + self.deck.h + 5,
+                        self.life.w + self.deck.w + 16, 2,
+                        pyxel.COLOR_GRAY)
         else:
-            pyxel.rect(8, self.deck.y - 5,
-                       2, self.deck.h + 10,
-                       pyxel.COLOR_GRAY)
-            pyxel.rect(8, self.deck.y + self.deck.h + 3,
-                       self.life.w + self.deck.w + 20, 2,
-                       pyxel.COLOR_GRAY)
-            self.deck.draw()
-            self.life.draw()
+            if self.show_ui:
+                pyxel.rect(8, self.deck.y - 5,
+                        2, self.deck.h + 10,
+                        pyxel.COLOR_GRAY)
+                pyxel.rect(8, self.deck.y + self.deck.h + 3,
+                        self.life.w + self.deck.w + 20, 2,
+                        pyxel.COLOR_GRAY)
+                self.deck.draw()
+                self.life.draw()
             self.chara.draw(self.life)
+
+    def UIHide(self):
+        '''
+        UI非表示
+        '''
+        self.show_ui = False
 
 
 class Button(ObjectBase):
     '''
     クリックで動作するボタンクラス
     '''
-    def __init__(self, x: float, y: float, txt: str):
+    def __init__(self, x: float, y: float, txt: str, is_show: bool = True):
         w = self.TextWidth(txt)
         super().__init__(x, y, w + 8, 19)
         self.text = txt
+        self.is_show = is_show
 
     def IsClick(self) -> bool:
         '''
         クリック判定
         '''
+        # 非表示中はクリックされない
+        if self.is_show is False:
+            return False
+
         return pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT) \
             and self.IsOverMouse()
 
@@ -731,10 +765,19 @@ class Button(ObjectBase):
         '''
         self.is_mouse_over = self.IsOverMouse()
 
+    def Show(self):
+        self.is_show = True
+
+    def Hide(self):
+        self.is_show = False
+
     def draw(self):
         '''
         描画
         '''
+        if self.is_show is False:
+            return
+
         if self.is_mouse_over:
             self.LineRect(pyxel.COLOR_YELLOW, pyxel.COLOR_GRAY)
         else:
@@ -832,6 +875,47 @@ class MessageBox(ObjectBase):
         self.disp = ''
 
 
+class GallaryArrow(ObjectBase):
+    def __init__(self, direction: int):
+        x = 10
+        if direction == 1:
+            x = pyxel.width - 20
+        super().__init__(x, pyxel.height / 2 - 5, 10, 10)
+        self.direction = direction
+        self.enabled = True
+        self.base_x = x
+
+    def update(self):
+        if self.enabled:
+            if pyxel.frame_count % 60 == 0:
+                if self.direction == 0:
+                    self.x = self.base_x - 5
+                else:
+                    self.x = self.base_x + 5
+            elif pyxel.frame_count % 30 == 0:
+                if self.direction == 0:
+                    self.x = self.base_x + 5
+                else:
+                    self.x = self.base_x - 5
+        else:
+            self.x = self.base_x
+
+    def draw(self):
+        col = pyxel.COLOR_YELLOW
+        if self.enabled is False:
+            col = pyxel.COLOR_GRAY
+        if self.direction == 0:
+            pyxel.tri(self.x, self.y,
+                      self.x + self.w, self.y - self.h / 2,
+                      self.x + self.w, self.y + self.h / 2,
+                      col)
+        else:
+            pyxel.tri(self.x + self.w, self.y,
+                      self.x, self.y - self.h / 2,
+                      self.x, self.y + self.h / 2,
+                      col)
+
+
 class App(ObjectBase):
     def __init__(self):
         super().__init__(0, 0, 0, 0)
@@ -856,12 +940,13 @@ class App(ObjectBase):
             pyxel.images[0].load(0, 0, 'assets/Pallet.png', incl_colors=True)
 
             # bgm ファイル読み込み
-            with open("assets/music.json", "rt", encoding="utf-8") as fin:
-                opening_bgm = json.loads(fin.read())
-            if pyxel.play_pos(0) is None:
-                for ch, sound in enumerate(opening_bgm):
-                    pyxel.sound(ch).set(*sound)
-                    pyxel.play(ch, ch, loop=True)
+            bgm_path = 'assets/music.json'
+            if os.path.exists(bgm_path):
+                with open(bgm_path, "rt", encoding="utf-8") as fin:
+                    opening_bgm = json.loads(fin.read())
+                self.BGMChange(opening_bgm)
+            else:
+                return False
 
             # フォント読み込みチェック
             if FONT_JP is None:
@@ -880,34 +965,74 @@ class App(ObjectBase):
         self.game_sate = GameState.TITLE
         self.choose = None
         self.wait = 0
-
+        txt = 'Start'
+        txt_w = self.TextWidth(txt) / 2
+        self.start_btn = Button(pyxel.width / 2 - txt_w,
+                                pyxel.height / 2 + 15,
+                                txt)
+        txt = 'gallary mode'
+        txt_w = self.TextWidth(txt) / 2
+        self.gallary_btn = Button(pyxel.width / 2 - txt_w,
+                                  pyxel.height / 2 + 40,
+                                  txt, False)
+        txt = '←'
+        txt_w = self.TextWidth(txt) / 2
+        self.return_btn = Button(10, 10, txt)
+        self.gal_arw_l = GallaryArrow(0)
+        self.gal_arw_r = GallaryArrow(1)
+        
+        # debug
         self.is_debug_view = False
 
     def update(self):
         '''
         データ更新
         '''
-        if GameState.TITLE != self.game_sate:
+        if GameState.TITLE != self.game_sate \
+                or GameState.GALLARY != self.game_sate:
             self.player.update()
             self.com.update()
             self.msg_box.update()
 
-            # debug
-            self.is_debug_view = pyxel.btn(pyxel.KEY_D)
-
         if GameState.TITLE == self.game_sate:
-            # タイトル画面
-            if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
+            self.start_btn.update()
+            self.gallary_btn.update()
+
+            # debug
+            if pyxel.btnp(pyxel.KEY_D):
+                if self.gallary_btn.is_show:
+                    self.gallary_btn.Hide()
+                else:
+                    self.gallary_btn.Show()
+
+            # ゲーム画面へ移行
+            if self.start_btn.IsClick():
+                self.wait = 60
+                # self.BGMChange()
+                self.msg_box.SetMessage('Hand card drow')
                 self.game_sate = GameState.INIT
+
+            # ギャラリーモードへ移行
+            if self.gallary_btn.IsClick():
+                self.com.chara.x = \
+                    pyxel.width / 2 - self.com.chara.w / 2
+                self.com.chara.y = 15
+                self.com.UIHide()
+                self.game_sate = GameState.GALLARY
 
         elif GameState.INIT == self.game_sate:
             if self.player.deck.IsAllInit():
                 if self.msg_box.state == MsgState.WAIT:
+                    self.wait -= 1
+                if self.wait <= 0:
                     # ゲーム開始前の初期化
                     self.msg_box.SetMessage('Choose your card')
                     self.game_sate = GameState.SELECT
 
         elif GameState.SELECT == self.game_sate:
+            # debug
+            self.is_debug_view = pyxel.btn(pyxel.KEY_D)
+
             # 初期動作、カードを選択するまでの処理
             if self.choose is None:
                 # 選択肢表示するか？
@@ -971,6 +1096,7 @@ class App(ObjectBase):
                 self.msg_box.SetMessage('Hand card drow')
                 self.player.deck.HandDrow()
                 self.com.deck.HandDrow()
+                self.wait = 60
                 self.game_sate = GameState.INIT
 
         elif GameState.GAME_SET == self.game_sate:
@@ -985,19 +1111,60 @@ class App(ObjectBase):
                     self.msg_box.SetMessage('COM Win!')
                 elif self.com.life.life <= 0:
                     self.msg_box.SetMessage('Player Win!')
+                    self.gallary_btn.Show()
                 else:
                     self.msg_box.SetMessage('No contest ...')
                 self.game_sate = GameState.END
+                self.wait = 60
 
         elif GameState.END == self.game_sate:
-            # リセット待ち
-            if pyxel.btnp(pyxel.KEY_R):
+            if self.msg_box.state == MsgState.WAIT:
+                self.wait -= 1
+            if self.wait <= 0:
+                self.msg_box.SetMessage('Retry?')
+                self.choose = ChooseBox(self.msg_box.y + 2)
+                self.game_sate = GameState.END_WAIT
+
+        elif GameState.END_WAIT == self.game_sate:
+            # リトライ選択肢
+            self.choose.update()
+            if self.choose.IsYes():
                 self.player = Player(CTRL_PLAYER)
                 self.com = Player(CTRL_COM)
                 self.msg_box = MessageBox()
+                # 再挑戦
                 self.game_sate = GameState.INIT
                 self.choose = None
-                self.wait = 0
+                self.wait = 60
+            elif self.choose.IsNo():
+                self.player = Player(CTRL_PLAYER)
+                self.com = Player(CTRL_COM)
+                self.msg_box = MessageBox()
+                # タイトル画面へ
+                self.game_sate = GameState.TITLE
+                self.choose = None
+                self.wait = 60
+        elif GameState.GALLARY == self.game_sate:
+            self.com.update()
+            self.return_btn.update()
+            self.gal_arw_l.update()
+            self.gal_arw_r.update()
+
+            if self.return_btn.IsClick():
+                # タイトル画面へ
+                self.com = Player(CTRL_COM)
+                self.game_sate = GameState.TITLE
+                self.wait = 60
+
+            # キャラの切り替え
+            if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
+                if pyxel.mouse_x < 20:
+                    self.com.life.Damege(-1)
+                if pyxel.width - 20 < pyxel.mouse_x:
+                    self.com.life.Damege(1)
+
+            self.gal_arw_l.enabled = not (LIFE_MAX <= self.com.life.life)
+            self.gal_arw_r.enabled = not (self.com.life.life <= 0)
 
     def draw(self):
         '''
@@ -1006,11 +1173,17 @@ class App(ObjectBase):
         pyxel.cls(pyxel.COLOR_NAVY)
 
         if GameState.TITLE == self.game_sate:
-            top = pyxel.height / 2 - 5
+            top = pyxel.height / 2 - 20
             self.DrawTextCenter(top, TITLE,
                                 pyxel.COLOR_WHITE, pyxel.COLOR_RED)
-            self.DrawTextCenter(top + 15, 'Click to start',
-                                pyxel.COLOR_WHITE, pyxel.COLOR_NAVY)
+            self.start_btn.draw()
+            self.gallary_btn.draw()
+        elif GameState.GALLARY == self.game_sate:
+            # ギャラリーモード
+            self.com.draw()
+            self.return_btn.draw()
+            self.gal_arw_l.draw()
+            self.gal_arw_r.draw()
         else:
             self.com.draw()
             self.player.draw()
