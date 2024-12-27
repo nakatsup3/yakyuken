@@ -197,17 +197,28 @@ class ObjectBase:
                     pyxel.text(x + dx, y + dy, s, bcol, FONT_JP)
         pyxel.text(x, y, s, col, FONT_JP)
 
+    def MusicRead(self, bgm_path: str) -> any:
+        if os.path.exists(bgm_path):
+            with open(bgm_path, "rt", encoding="utf-8") as fin:
+                return json.loads(fin.read())
+        else:
+            return None
+
     def BGMChange(self, music):
         '''
         BGM変更
         '''
         # 全チャンネルBGM　OFF
         pyxel.stop()
+        if music is None:
+            return
+
         # if pyxel.play_pos(0) is None:
         # BGM再生
         for ch, sound in enumerate(music):
             pyxel.sound(ch).set(*sound)
             pyxel.play(ch, ch, loop=True)
+
 
 class Card(ObjectBase):
     '''
@@ -940,13 +951,15 @@ class App(ObjectBase):
             pyxel.images[0].load(0, 0, 'assets/Pallet.png', incl_colors=True)
 
             # bgm ファイル読み込み
-            bgm_path = 'assets/music.json'
-            if os.path.exists(bgm_path):
-                with open(bgm_path, "rt", encoding="utf-8") as fin:
-                    opening_bgm = json.loads(fin.read())
-                self.BGMChange(opening_bgm)
-            else:
-                return False
+            bgm_path = 'assets/op.json'
+            self.opening_bgm = self.MusicRead(bgm_path)
+            self.BGMChange(self.opening_bgm)
+
+            bgm_path = 'assets/battle.json'
+            self.battle_bgm = self.MusicRead(bgm_path)
+
+            bgm_path = 'assets/hp1.json'
+            self.hp1_bgm = self.MusicRead(bgm_path)
 
             # フォント読み込みチェック
             if FONT_JP is None:
@@ -1008,7 +1021,7 @@ class App(ObjectBase):
             # ゲーム画面へ移行
             if self.start_btn.IsClick():
                 self.wait = 60
-                # self.BGMChange()
+                self.BGMChange(self.battle_bgm)
                 self.msg_box.SetMessage('Hand card drow')
                 self.game_sate = GameState.INIT
 
@@ -1077,6 +1090,8 @@ class App(ObjectBase):
                     self.player.life.Damege(1)
                     self.msg_box.SetMessage('Player Damege!')
                     self.player.chara.SetDamage()
+                    if self.player.life.life == 1:
+                        self.BGMChange(self.hp1_bgm)
                 if result == 0:
                     self.msg_box.SetMessage('Drow!')
                 self.wait = 60
@@ -1142,8 +1157,10 @@ class App(ObjectBase):
                 self.msg_box = MessageBox()
                 # タイトル画面へ
                 self.game_sate = GameState.TITLE
+                self.BGMChange(self.opening_bgm)
                 self.choose = None
                 self.wait = 60
+
         elif GameState.GALLARY == self.game_sate:
             self.com.update()
             self.return_btn.update()
