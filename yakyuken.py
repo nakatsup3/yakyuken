@@ -4,8 +4,11 @@ from enum import Enum
 from math import sqrt
 import platform
 import json
+import os
 
 
+# マウスカーソルの有無を設定するために
+# スマホ・PCのどちらかであるかを判別するための処理
 is_web_launcher = True
 try:
     from js import navigator
@@ -34,8 +37,13 @@ HAND_MAX = 5
 # 手札表示幅
 HAND_W = (CARD_W + 5) * HAND_MAX + 5
 
-# テキスト表示
-FONT_JP = pyxel.Font('assets/umplus_j10r.bdf')
+# テキスト表示用フォント読み込み
+try:
+    FONT_JP = pyxel.Font('assets/umplus_j10r.bdf')
+except Exception:
+    FONT_JP = None
+
+# メッセージボックスの上辺の位置
 MSG_BOX_TOP = WINDOW_HEIGHT - 50
 
 # プレイヤー操作
@@ -56,7 +64,11 @@ LIFE_W = ONE_LIFE_W * LIFE_MAX + 2
 # ダメージ表現実施時間
 DAMAGE_WAIT = 60
 
+
 class DeviceChecker:
+    '''
+    デバイ情報確認クラス
+    '''
     def __init__(self):
         if is_web_launcher:
             # Web launcherから起動している場合、js関数でOS判定する
@@ -67,16 +79,20 @@ class DeviceChecker:
         else:
             # ローカルから起動している場合、platformから判定する
             self.os_name = platform.system()
-            self.os_pc = self.os_name == "Windows" \
-                         or self.os_name == "Darwin" \
-                         or self.os_name == "Linux"
+            self.os_pc = (self.os_name == "Windows"
+                          or self.os_name == "Darwin"
+                          or self.os_name == "Linux")
+
     def is_pc(self):
+        '''
+        動作環境はPCか?
+        '''
         return self.os_pc
 
 
 class GameState(Enum):
     '''
-    ゲーム状態遷移定数
+    ゲーム状態遷移
     '''
     TITLE = 0       # タイトル画面
     INIT = 1        # 最初に１度だけ行う処理
@@ -88,6 +104,9 @@ class GameState(Enum):
 
 
 class CardState(Enum):
+    '''
+    カードクラスの状態遷移
+    '''
     MOVING = 0      # 移動中
     WAIT = 1        # 待機状態
     LOCK = 2        # カードに触っても反応させない
@@ -95,16 +114,25 @@ class CardState(Enum):
 
 
 class CharaState(Enum):
+    '''
+    キャラ表示の状態遷移
+    '''
     WAIT = 0        # 待機中
     DAMAGE = 1      # ダメージ演出中
 
 
 class LifeState(Enum):
+    '''
+    ライフの状態遷移
+    '''
     WAIT = 0        # 待機中
     DECRASE = 1     # Life減少中
 
 
 class MsgState(Enum):
+    '''
+    メッセージボックスの状態遷移
+    '''
     WAIT = 0        # 待機中
     DISPLAYING = 1  # メッセージ表示中
 
@@ -135,13 +163,22 @@ class ObjectBase:
         pyxel.rectb(self.x, self.y, self.w, self.h, outer_color)
         pyxel.rect(self.x + 1, self.y + 1, self.w - 2, self.h - 2, inner_color)
 
+    def TextWidth(self, txt: str) -> int:
+        '''
+        文字列の幅を計算
+        '''
+        if FONT_JP is not None:
+            return FONT_JP.text_width(txt)
+        else:
+            return len(txt) * 4
+
     def DrawTextCenter(self, y: float, s: str,
                        col: int, bcol: int = None):
         '''
         縁取りテキスト描画中央寄せ
         '''
         # 中央寄せ
-        x = (pyxel.width / 2) - (FONT_JP.text_width(s) / 2)
+        x = (pyxel.width / 2) - (self.TextWidth(s) / 2)
         self.DrawText(x, y, s, col, bcol)
 
     def DrawText(self, x: float,  y: float, s: str,
@@ -151,6 +188,7 @@ class ObjectBase:
         '''
         if bcol is None:
             bcol = pyxel.COLOR_BLACK
+
         # アウトライン描画
         for dx in range(-1, 2):
             for dy in range(-1, 2):
@@ -533,18 +571,13 @@ class Character(ObjectBase):
         self.e_val_b = 0        # 横揺れ変数
         self.cnt = DAMAGE_WAIT  # 横揺れ時間
         if side == CTRL_COM:
-            self.img0 = pyxel.Image(144, 256)
-            self.img0.load(x=0, y=0, filename='assets/0000.png')
-            # self.img1 = pyxel.Image(144, 256)
-            # self.img1.load(x=0, y=0, filename='assets/0001.png')
-            # self.img2 = pyxel.Image(144, 256)
-            # self.img2.load(x=0, y=0, filename='assets/0002.png')
-            # self.img3 = pyxel.Image(144, 256)
-            # self.img3.load(x=0, y=0, filename='assets/0003.png')
-            # self.img4 = pyxel.Image(144, 256)
-            # self.img4.load(x=0, y=0, filename='assets/0004.png')
-            # self.img5 = pyxel.Image(144, 256)
-            # self.img5.load(x=0, y=0, filename='assets/0005.png')
+            self.com_images = []
+            for i in range(6):
+                img_path = f'assets/{i:04}.png'
+                if os.path.exists(img_path):
+                    img = pyxel.Image(144, 256)
+                    img.load(x=0, y=0, filename=img_path)
+                    self.com_images.append(img)
 
     def update(self):
         '''
@@ -573,26 +606,23 @@ class Character(ObjectBase):
         idx = LIFE_MAX - lifebox.life
 
         if self.side == CTRL_PLAYER:
+            # debug Todo: プレイヤーの画像を用意する
             pyxel.dither(0.5)
-            # debug
             pyxel.rect(self.x, self.y,
-                    self.w, self.h, pyxel.COLOR_WHITE + idx)
-            pyxel.dither(1.0) 
+                       self.w, self.h, pyxel.COLOR_WHITE + idx)
+            pyxel.dither(1.0)
             self.DrawText(self.x + 4, self.y + 4, 'Player', pyxel.COLOR_WHITE)
+
         else:
-            pyxel.blt(self.x - 40, self.y, self.img0, 0, 0, 144, 256, colkey=16)
-            # if idx == 0:
-            #     pyxel.blt(self.x - 40, self.y, self.img0, 0, 0, 144, 256, colkey=16)
-            # if idx == 1:
-            #     pyxel.blt(self.x - 40, self.y, self.img1, 0, 0, 144, 256, colkey=16)
-            # if idx == 2:
-            #     pyxel.blt(self.x - 40, self.y, self.img2, 0, 0, 144, 256, colkey=16)
-            # if idx == 3:
-            #     pyxel.blt(self.x - 40, self.y, self.img3, 0, 0, 144, 256, colkey=16)
-            # if idx == 4:
-            #     pyxel.blt(self.x - 40, self.y, self.img4, 0, 0, 144, 256, colkey=16)
-            # if idx == 5:
-            #     pyxel.blt(self.x - 40, self.y, self.img5, 0, 0, 144, 256, colkey=16)
+            if idx < len(self.com_images):
+                pyxel.blt(self.x - 40, self.y, self.com_images[idx],
+                          0, 0, 144, 256, colkey=16)
+            else:
+                # 画像読めなかった時
+                pyxel.dither(0.5)
+                pyxel.rect(self.x, self.y,
+                           self.w, self.h, pyxel.COLOR_WHITE + idx)
+                pyxel.dither(1.0)
             self.DrawText(self.x + 4, self.y + 4, 'COM', pyxel.COLOR_WHITE)
 
     def Wave(self, offset: float, a: float, b: float) -> float:
@@ -621,7 +651,7 @@ class Player(ObjectBase):
         else:
             super().__init__(pyxel.width / 2, 0,
                              pyxel.width / 2, pyxel.height)
-        
+
         # 手札位置,ライフゲージ,キャラクターセット
         if self.side == CTRL_PLAYER:
             dec_x = pyxel.width - HAND_W - 15
@@ -684,7 +714,7 @@ class Button(ObjectBase):
     クリックで動作するボタンクラス
     '''
     def __init__(self, x: float, y: float, txt: str):
-        w = FONT_JP.text_width(txt)
+        w = self.TextWidth(txt)
         super().__init__(x, y, w + 8, 19)
         self.text = txt
 
@@ -718,7 +748,7 @@ class ChooseBox(ObjectBase):
     選択肢クラス
     '''
     def __init__(self, y: float):
-        w = FONT_JP.text_width('YesNo') + 10
+        w = self.TextWidth('YesNo') + 10
         x = pyxel.width - w - 20
         self.yes_btn = Button(x + 2, y + 2, 'Yes')
         self.no_btn = Button(self.yes_btn.x + self.yes_btn.w + 2,
@@ -809,21 +839,36 @@ class App(ObjectBase):
                    title=TITLE, fps=FPS, display_scale=2)
         deviceChecker = DeviceChecker()
         pyxel.mouse(deviceChecker.is_pc())
-        self.ReadResources()
+        has_resources = self.ReadResources()
         self.DefineVariables()
-        pyxel.run(self.update, self.draw)
 
-    def ReadResources(self):
+        if has_resources:
+            pyxel.run(self.update, self.draw)
+        else:
+            pyxel.run(self.err_update, self.err_draw)
+
+    def ReadResources(self) -> bool:
         '''
         リソースファイルの読み込み
         '''
-        pyxel.images[0].load(0, 0, 'assets/Pallet.png', incl_colors=True)
-        with open(f"assets/music.json", "rt",encoding="utf-8") as fin:
-            self.music = json.loads(fin.read())
-        if pyxel.play_pos(0) is None:
-            for ch, sound in enumerate(self.music):
-                pyxel.sound(ch).set(*sound)
-                pyxel.play(ch, ch, loop=True)
+        try:
+            # 色のパレットデータ読み込み
+            pyxel.images[0].load(0, 0, 'assets/Pallet.png', incl_colors=True)
+
+            # bgm ファイル読み込み
+            with open("assets/music.json", "rt", encoding="utf-8") as fin:
+                opening_bgm = json.loads(fin.read())
+            if pyxel.play_pos(0) is None:
+                for ch, sound in enumerate(opening_bgm):
+                    pyxel.sound(ch).set(*sound)
+                    pyxel.play(ch, ch, loop=True)
+
+            # フォント読み込みチェック
+            if FONT_JP is None:
+                return False
+        except Exception:
+            return False
+        return True
 
     def DefineVariables(self):
         '''
@@ -835,7 +880,7 @@ class App(ObjectBase):
         self.game_sate = GameState.TITLE
         self.choose = None
         self.wait = 0
-        
+
         self.is_debug_view = False
 
     def update(self):
@@ -969,8 +1014,8 @@ class App(ObjectBase):
         else:
             self.com.draw()
             self.player.draw()
-            
             self.msg_box.draw()
+
             if self.choose is not None:
                 self.choose.draw()
 
@@ -1027,6 +1072,21 @@ class App(ObjectBase):
             return True
 
         return False
+
+    def err_update(self):
+        '''
+        エラー時の処理
+        '''
+        pass
+
+    def err_draw(self):
+        '''
+        エラーの描画
+        '''
+        pyxel.cls(pyxel.COLOR_DARK_BLUE)
+        self.DrawTextCenter(pyxel.height / 2,
+                            'resources read error',
+                            pyxel.COLOR_WHITE, pyxel.COLOR_RED)
 
 
 # 開始
