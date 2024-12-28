@@ -961,6 +961,12 @@ class App(ObjectBase):
             bgm_path = 'assets/hp1.json'
             self.hp1_bgm = self.MusicRead(bgm_path)
 
+            bgm_path = 'assets/win.json'
+            self.win_bgm = self.MusicRead(bgm_path)
+
+            bgm_path = 'assets/make.json'
+            self.make_bgm = self.MusicRead(bgm_path)
+
             # フォント読み込みチェック
             if FONT_JP is None:
                 return False
@@ -1124,11 +1130,14 @@ class App(ObjectBase):
             if self.wait <= 0:
                 if self.player.life.life <= 0:
                     self.msg_box.SetMessage('COM Win!')
+                    self.BGMChange(self.make_bgm)
                 elif self.com.life.life <= 0:
                     self.msg_box.SetMessage('Player Win!')
                     self.gallary_btn.Show()
+                    self.BGMChange(self.win_bgm)
                 else:
                     self.msg_box.SetMessage('No contest ...')
+                    self.BGMChange(self.make_bgm)
                 self.game_sate = GameState.END
                 self.wait = 60
 
@@ -1149,6 +1158,7 @@ class App(ObjectBase):
                 self.msg_box = MessageBox()
                 # 再挑戦
                 self.game_sate = GameState.INIT
+                self.BGMChange(self.battle_bgm)
                 self.choose = None
                 self.wait = 60
             elif self.choose.IsNo():
