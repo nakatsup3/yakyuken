@@ -16,10 +16,10 @@
       <p>Play</p>
     </a>
     <p>完全なる運ゲー</p>
-    <img src="assets/001.png"/>
+    <img src="assets/001.png" style="max-width: 100%; height: auto;"/>
   </div>
   
-  <div class="container">
+  <div class="container" style="padding: 10px;">
     <div class="row">
       <div class="col-sm-6">
         <h2>あそびかた</h2>
@@ -31,7 +31,7 @@
         <br/>
         <p>勝てばCOMのライフが減り</p>
         <p>負ければPlayerのライフが減る。</p>
-        <p>COMのライフを0にして勝利しよう！</p>
+        <p>COMのライフを0にして勝利しよう&#xFF01;</p>
         <br/>
       </div>
       <div class="col-sm-6">
@@ -54,6 +54,24 @@
         <h3>カードの補充</h3>
         <p>毎ターン１枚のカードが</p>
         <p>山札からランダムに供給される。</p>
+        <br/>
+      </div>
+      <div class="col-sm-6">
+        <h2>お楽しみ要素</h2>
+        <br/>
+        <p>勝利してタイトル画面に戻るとギャラリーモードが追加されます。</p>
+        <br/>
+      </div>
+      <div class="col-sm-6">
+        <h2>ライセンス</h2>
+        <pre id="text"></pre>
+        <script>
+        fetch("license.txt")
+          .then(response => response.text())
+          .then(data => {
+            document.getElementById("text").textContent = data;
+          });
+        </script>
       </div>
     </div>
   </div>
